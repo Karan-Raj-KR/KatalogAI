@@ -6,20 +6,14 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/katalogai/katalogai/actions/workflows/ci.yml">
-    <img src="https://github.com/katalogai/katalogai/actions/workflows/ci.yml/badge.svg" alt="CI">
+  <a href="https://github.com/Karan-Raj-KR/KatalogAI/actions/workflows/ci.yml">
+    <img src="https://github.com/Karan-Raj-KR/KatalogAI/actions/workflows/ci.yml/badge.svg" alt="CI">
   </a>
-  <a href="https://github.com/katalogai/katalogai/actions/workflows/deploy.yml">
-    <img src="https://github.com/katalogai/katalogai/actions/workflows/deploy.yml/badge.svg" alt="Deploy">
-  </a>
-  <a href="https://pypi.org/project/katalogai/">
-    <img src="https://img.shields.io/pypi/v/katalogai.svg" alt="PyPI">
-  </a>
-  <a href="https://pepy.tech/project/katalogai">
-    <img src="https://pepy.tech/badge/katalogai" alt="Downloads">
+  <a href="https://github.com/Karan-Raj-KR/KatalogAI/actions/workflows/deploy.yml">
+    <img src="https://github.com/Karan-Raj-KR/KatalogAI/actions/workflows/deploy.yml/badge.svg" alt="Deploy">
   </a>
   <a href="LICENSE">
-    <img src="https://img.shields.io/github/license/katalogai/katalogai.svg" alt="MIT License">
+    <img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT License">
   </a>
   <img src="https://img.shields.io/badge/python-3.12%2B-blue" alt="Python 3.12+">
   <img src="https://img.shields.io/badge/FastAPI-0.115%2B-009688" alt="FastAPI">
@@ -179,8 +173,8 @@ Parle-G biscuits 200g, MRP Rs 30
 ### Option A — Docker (recommended)
 
 ```bash
-git clone https://github.com/katalogai/katalogai.git
-cd katalogai
+git clone https://github.com/Karan-Raj-KR/KatalogAI.git
+cd KatalogAI
 cp .env.example .env          # fill in your keys
 docker-compose up -d
 ```
@@ -190,8 +184,8 @@ The API will be live at `http://localhost:8000`. Interactive docs at `http://loc
 ### Option B — Local
 
 ```bash
-git clone https://github.com/katalogai/katalogai.git
-cd katalogai
+git clone https://github.com/Karan-Raj-KR/KatalogAI.git
+cd KatalogAI
 
 # Install (uv recommended, pip also works)
 pip install -e ".[dev]"
@@ -381,7 +375,7 @@ MIT — see [LICENSE](LICENSE) for details.
 
 ## Links & Acknowledgments
 
-- **Issues / Bugs**: [github.com/katalogai/katalogai/issues](https://github.com/katalogai/katalogai/issues)
-- **Discussions**: [github.com/katalogai/katalogai/discussions](https://github.com/katalogai/katalogai/discussions)
+- **Issues / Bugs**: [github.com/Karan-Raj-KR/KatalogAI/issues](https://github.com/Karan-Raj-KR/KatalogAI/issues)
+- **Discussions**: [github.com/Karan-Raj-KR/KatalogAI/discussions](https://github.com/Karan-Raj-KR/KatalogAI/discussions)
 
 Built with [ONDC](https://ondc.org/) protocol specs · [Google Gemini](https://gemini.google.com/) · [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) · [pgvector](https://github.com/pgvector/pgvector)
