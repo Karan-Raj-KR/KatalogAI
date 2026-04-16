@@ -1,85 +1,134 @@
 # Contributing to KatalogAI
 
-Thank you for your interest in contributing to KatalogAI!
+Thank you for your interest in contributing!
 
 ## Code of Conduct
 
-By participating in this project, you agree to abide by our [Code of Conduct](CODE_OF_CONDUCT.md). Please read it before contributing.
+By participating, you agree to our [Code of Conduct](CODE_OF_CONDUCT.md).
 
-## How to Contribute
+---
 
-### Reporting Bugs
+## Local Setup
 
-1. **Search existing issues** - Check if the bug has already been reported
-2. **Create a detailed issue** - Use the bug report template
-3. **Include reproduction steps** - Help us understand the issue
+### Prerequisites
 
-### Suggesting Features
+- Docker and Docker Compose
+- Python 3.12+ (for running tests outside Docker)
+- An `ANTHROPIC_API_KEY` and `GOOGLE_API_KEY` (see `.env.example`)
 
-1. **Search existing discussions** - Check if the feature has been discussed
-2. **Create a feature request** - Use the feature request template
-3. **Explain the use case** - Help us understand why this feature is needed
-
-### Pull Requests
-
-1. **Fork the repository**
-2. **Create a feature branch**: `git checkout -b feature/my-feature`
-3. **Make your changes** - Follow our coding standards
-4. **Run tests**: `make test`
-5. **Run linting**: `make lint`
-6. **Run type checking**: `make typecheck`
-7. **Commit with clear messages**: [Conventional Commits](https://www.conventionalcommits.org/)
-8. **Push to your fork**
-9. **Submit a pull request**
-
-## Development Setup
+### Start with Docker Compose
 
 ```bash
-# Clone and setup
 git clone https://github.com/katalogai/katalogai.git
-cd katalogai
-pip install -e ".[dev]"
+cd KatalogAI
 
-# Run tests
-make test
+cp .env.example .env        # fill in your API keys
+
+docker compose -f docker/docker-compose.yml up --build
 ```
 
-## Coding Standards
+This starts four services:
 
-- **Format**: Use `ruff` for formatting
-- **Type Checking**: Use `mypy` with strict mode
-- **Testing**: Write tests for new features; aim for >80% coverage
-- **Docstrings**: Use Google-style docstrings
+| Service  | Port | Purpose                        |
+|----------|------|--------------------------------|
+| postgres | 5432 | Product catalog database       |
+| redis    | 6379 | Job queue (Celery broker)      |
+| api      | 8000 | FastAPI application            |
+| worker   | —    | Celery worker for async jobs   |
 
-## Commit Message Format
+The API is available at `http://localhost:8000`. Interactive docs at `http://localhost:8000/docs`.
 
-```
-<type>(<scope>): <description>
+### Run Without Docker (dev loop)
 
-[optional body]
-
-[optional footer]
-```
-
-Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
-
-Example:
-```
-feat(ingest): add support for batch text ingestion
-
-- Added batch endpoint for processing multiple products
-- Updated confidence scoring for batch items
+```bash
+uv sync --all-extras
+uv run uvicorn app.main:app --reload        # API
+uv run celery -A app.worker worker -l info  # Worker (separate terminal)
 ```
 
-## Review Process
+---
 
-- PRs require at least one approval
-- All CI checks must pass
-- Address review feedback promptly
+## Running Tests
+
+```bash
+make test          # full suite
+make test-unit     # unit tests only (no external services needed)
+make lint          # ruff + mypy
+```
+
+---
+
+## Codebase Map
+
+```
+app/
+  api/          # FastAPI routers and request/response schemas
+  ml/
+    agent/      # Claude-powered agentic pipeline
+      orchestrator.py   # main agent loop
+      tools.py          # tool definitions (OCR, HSN lookup, …)
+      prompts.py        # system + user prompt templates
+    ocr.py      # Gemini Vision OCR wrapper
+    vlm.py      # multimodal embedding / VLM helpers
+  services/
+    ingestion_service.py  # coordinates ML → DB pipeline
+  models/       # SQLAlchemy ORM models
+  db/           # database session and migrations (Alembic)
+scripts/
+  reference_data.csv  # HSN code reference table
+tests/
+  unit/         # fast, no-IO tests
+  integration/  # require running Postgres + Redis
+```
+
+The agent entry point is [app/ml/agent/orchestrator.py](app/ml/agent/orchestrator.py). New tools go in [app/ml/agent/tools.py](app/ml/agent/tools.py) and need a corresponding prompt update in [app/ml/agent/prompts.py](app/ml/agent/prompts.py).
+
+---
+
+## Pull Request Workflow
+
+1. Fork the repo and create a branch: `git checkout -b feat/my-change`
+2. Make changes; add or update tests.
+3. Run `make lint && make test` — both must pass.
+4. Commit using [Conventional Commits](https://www.conventionalcommits.org/): `feat(agent): add price extraction tool`
+5. Open a PR against `main`. One approval required; all CI checks must pass.
+
+---
+
+## Good First Issues
+
+These are well-scoped tasks with clear acceptance criteria — great places to start:
+
+### 1. Write the empty test files
+
+`tests/unit/` contains three stub files with no test bodies yet:
+
+- [tests/unit/test_text_parser.py](tests/unit/test_text_parser.py)
+- [tests/unit/test_confidence.py](tests/unit/test_confidence.py)
+- [tests/unit/test_hsn_retriever.py](tests/unit/test_hsn_retriever.py)
+
+Pick one, read the corresponding source module, and write `pytest` tests covering the happy path and at least one edge case. No external services needed.
+
+### 2. Add webhook support for job completion
+
+When an ingestion job finishes, optionally `POST` the result to a caller-supplied URL. Suggested approach:
+
+- Add an optional `webhook_url` field to the ingest request schema.
+- After the Celery task completes, fire an `httpx.AsyncClient.post` with the job result.
+- Add an integration test in [tests/integration/test_ingest_text.py](tests/integration/test_ingest_text.py) using `pytest-httpserver` or `respx` to assert the webhook fires.
+
+### 3. Add more HSN codes to `reference_data.csv`
+
+[scripts/reference_data.csv](scripts/reference_data.csv) is the HSN lookup table used by the agent. It currently covers common kirana categories but is incomplete. Add rows for:
+
+- Packaged drinking water (HSN 2201)
+- Spices and condiments (HSN 0904–0910)
+- Cleaning supplies / detergents (HSN 3402)
+
+Each row needs: `hsn_code`, `description`, `gst_rate`, `category`. Keep entries consistent with existing formatting.
+
+---
 
 ## Questions?
 
-- Open an issue for bugs/feature requests
-- Start a discussion for general questions
-
-Thank you for contributing!
+Open an issue for bugs or feature requests, or start a GitHub Discussion for general questions.

@@ -1,7 +1,3 @@
-"""
-HSN retriever using pgvector cosine similarity search.
-"""
-
 from dataclasses import dataclass
 
 from sqlalchemy import text
@@ -22,14 +18,14 @@ class HSNMatch:
     score: float
 
 
-def _cosine_similarity(v1: list[float], v2: list[float]) -> float:
+async def cosine_similarity(vec1: list[float], vec2: list[float]) -> float:
     """Compute cosine similarity between two vectors."""
-    dot = sum(a * b for a, b in zip(v1, v2))
-    norm1 = sum(a * a for a in v1) ** 0.5
-    norm2 = sum(b * b for b in v2) ** 0.5
-    if norm1 == 0 or norm2 == 0:
+    dot = sum(a * b for a, b in zip(vec1, vec2))
+    mag1 = sum(a * a for a in vec1) ** 0.5
+    mag2 = sum(b * b for b in vec2) ** 0.5
+    if mag1 == 0 or mag2 == 0:
         return 0.0
-    return dot / (norm1 * norm2)
+    return dot / (mag1 * mag2)
 
 
 async def retrieve_hsn(
@@ -38,30 +34,22 @@ async def retrieve_hsn(
     top_k: int = 5,
 ) -> list[HSNMatch]:
     """
-    Retrieve top-k similar HSN codes using pgvector cosine similarity.
-
-    Args:
-        text_query: Product description or name
-        db: Database session
-        top_k: Number of results to return
-
-    Returns:
-        List of HSNMatch tuples (code, description, score)
+    Retrieve top-k similar HSN codes using pgvector cosine similarity search.
     """
     query_embedding = embed_single(text_query)
-
     embedding_list = query_embedding.tolist()
+    embedding_str = "[" + ",".join(map(str, embedding_list)) + "]"
 
-    sql = text("""
+    sql = text(f"""
         SELECT code, description, gst_rate,
-               (embedding <=> :embedding::vector) as distance
+               (embedding <=> CAST(:embedding AS vector)) as distance
         FROM hsn_codes
         WHERE embedding IS NOT NULL
         ORDER BY distance ASC
         LIMIT :top_k
     """)
 
-    result = await db.execute(sql, {"embedding": embedding_list, "top_k": top_k})
+    result = await db.execute(sql, {"embedding": embedding_str, "top_k": top_k})
     rows = result.fetchall()
 
     matches = []

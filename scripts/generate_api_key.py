@@ -14,7 +14,7 @@ from app.db.session import async_session_maker
 from app.models.api_key import APIKey
 
 
-async def create_api_key(name: str, description: str) -> None:
+async def create_api_key(name: str) -> None:
     raw_key, key_prefix = generate_api_key()
     key_hash = hash_api_key(raw_key)
 
@@ -22,7 +22,6 @@ async def create_api_key(name: str, description: str) -> None:
         key_prefix=key_prefix,
         key_hash=key_hash,
         name=name,
-        description=description,
     )
 
     async with async_session_maker() as session:
@@ -36,17 +35,16 @@ async def create_api_key(name: str, description: str) -> None:
     print(f"Key: {raw_key}")
     print(f"Prefix: {key_prefix}")
     print(f"ID: {api_key.id}")
-    print(f"{'=' * 60}\n")
-    print("IMPORTANT: Save this key - it cannot be retrieved!\n")
+    print(f"{'=' * 60}")
+    print("IMPORTANT: Save this key - it cannot be retrieved!")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate a new API key")
     parser.add_argument("--name", required=True, help="Name for the API key")
-    parser.add_argument("--description", default="", help="Optional description")
     args = parser.parse_args()
 
-    asyncio.run(create_api_key(args.name, args.description))
+    asyncio.run(create_api_key(args.name))
 
 
 if __name__ == "__main__":

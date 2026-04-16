@@ -9,17 +9,13 @@ from __future__ import annotations
 
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger, request_id_var
+from app.ml.agent import ExtractionAgent
 from app.ml.confidence import aggregate_confidence
-from app.ml.hsn.retriever import retrieve_hsn
-from app.ml.hsn.verifier import verify_hsn
-from app.ml.ocr import extract_text_from_image
-from app.ml.text_parser import extract_all, extract_hints
-from app.ml.vlm import extract_with_gemini, extract_with_gemini_multimodal, merge_extractions
 from app.models.ingestion_job import IngestionJob
 from app.models.product import Product
 from app.models.product_field import ProductField
@@ -34,70 +30,6 @@ logger = get_logger(__name__)
 
 _REVIEW_THRESHOLD = 0.70
 
-
-async def _run_extraction(
-    text: str,
-    request_id: str,
-    db: AsyncSession,
-) -> dict[str, tuple[str | None, float]]:
-    """
-    Run the full extraction pipeline:
-    1. Regex pre-pass (text_parser) for hints and high-confidence fields
-    2. Gemini 2.5 Flash for complex fields
-    3. Retrieve and verify HSN code
-    4. Merge results
-    """
-    hints = extract_hints(text)
-    logger.info("Regex pre-pass completed", request_id=request_id, hints=list(hints.keys()))
-
-    regex_result = extract_all(text)
-
-    regex_for_merge: dict[str, tuple[str | None, float]] = {}
-    for field, result in regex_result.items():
-        regex_for_merge[field] = (result["value"], result["confidence"])
-
-    gemini_result = await extract_with_gemini(text, hints, request_id)
-
-    merged = merge_extractions(regex_for_merge, gemini_result)
-
-    has_gemini = any(
-        conf > 0.5 and (value is not None)
-        for field, (value, conf) in gemini_result.items()
-        if field not in ["mrp", "weight_grams", "volume_ml", "unit"]
-    )
-
-    if has_gemini:
-        for field, (value, conf) in gemini_result.items():
-            if field not in regex_for_merge or regex_for_merge[field][0] is None:
-                merged[field] = (value, conf)
-
-    name_val = merged.get("name", (None, 0.0))[0]
-    category_val = merged.get("category", (None, 0.0))[0]
-
-    if name_val:
-        hsn_matches = await retrieve_hsn(name_val, db, top_k=5)
-        if hsn_matches:
-            hsn_code, hsn_conf = await verify_hsn(
-                product_name=name_val,
-                category=category_val,
-                matches=hsn_matches,
-                request_id=request_id,
-            )
-            if hsn_code:
-                merged["hsn_code"] = (hsn_code, hsn_conf)
-                logger.info(
-                    "HSN assigned",
-                    request_id=request_id,
-                    hsn_code=hsn_code,
-                    confidence=hsn_conf,
-                )
-
-    overall = aggregate_confidence(merged)
-
-    merged["_overall_confidence"] = (str(overall), overall)
-
-    logger.info("Extraction pipeline completed", request_id=request_id, fields=len(merged))
-    return merged
 
 
 def _build_field_rows(
@@ -230,9 +162,9 @@ async def ingest_text(
     db.add(job)
     await db.flush()
 
-    extraction = await _run_extraction(request.text, request_id, db)
-    overall_raw = extraction.get("_overall_confidence", (None, 0.0))
-    overall = float(overall_raw[1]) if overall_raw[0] else aggregate_confidence(extraction)
+    agent = ExtractionAgent(db=db)
+    extraction = await agent.run(input_type="text", text=request.text, request_id=request_id)
+    overall = aggregate_confidence(extraction)
 
     name_value, _ = extraction.get("name", (request.text[:500], 0.85))
     mrp_raw, _ = extraction.get("mrp", (None, 0.0))
@@ -295,7 +227,7 @@ async def ingest_text(
     elapsed_ms = int((time.monotonic() - t0) * 1000)
     status = "needs_review" if review_rows else "completed"
     job.status = status
-    job.completed_at = datetime.now(datetime.UTC)
+    job.completed_at = datetime.now(timezone.utc)
     job.processing_ms = elapsed_ms
 
     await db.commit()
@@ -384,45 +316,15 @@ async def process_image_pipeline(
     except ImageProcessingError as e:
         raise ValueError(f"Image processing failed: {e}")
 
-    ocr_result = await extract_text_from_image(processed.bytes)
-    ocr_text = ocr_result.text
-    ocr_confidence = ocr_result.confidence
-
-    logger.info(
-        "OCR completed",
-        request_id=request_id,
-        ocr_text_length=len(ocr_text),
-        ocr_confidence=ocr_confidence,
-    )
-
-    hints: dict[str, str] = {}
-
-    gemini_result = await extract_with_gemini_multimodal(
+    agent = ExtractionAgent(db=db)
+    merged = await agent.run(
+        input_type="image",
         image_bytes=processed.bytes,
-        ocr_text=ocr_text,
-        hints=hints,
         request_id=request_id,
     )
+    ocr_text, ocr_confidence = agent.ocr_result
 
-    merged = gemini_result
-
-    name_val = merged.get("name", (None, 0.0))[0]
-    category_val = merged.get("category", (None, 0.0))[0]
-
-    if name_val:
-        hsn_matches = await retrieve_hsn(name_val, db, top_k=5)
-        if hsn_matches:
-            hsn_code, hsn_conf = await verify_hsn(
-                product_name=name_val,
-                category=category_val,
-                matches=hsn_matches,
-                request_id=request_id,
-            )
-            if hsn_code:
-                merged["hsn_code"] = (hsn_code, hsn_conf)
-
-    overall_raw = merged.get("_overall_confidence", (None, 0.0))
-    overall = float(overall_raw[1]) if overall_raw[0] else aggregate_confidence(merged)
+    overall = aggregate_confidence(merged)
 
     name_value, _ = merged.get("name", (None, 0.0))
     mrp_raw, _ = merged.get("mrp", (None, 0.0))

@@ -114,12 +114,12 @@ async def verify_hsn(
         prompt = prompt.replace("{{options}}", options_text)
 
         response = client.models.generate_content(
-            model="gemini-2.0-flash-exp",
+            model="gemini-2.5-flash",
             contents=prompt,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
                 temperature=0.1,
-                max_tokens=512,
+                max_output_tokens=512,
             ),
         )
 

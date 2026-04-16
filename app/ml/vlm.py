@@ -78,7 +78,7 @@ def _build_prompt(text: str, hints: dict[str, str]) -> str:
 
     hints_str = ", ".join(f"{k}: {v}" for k, v in hints.items()) if hints else "No hints available"
     prompt = prompt_template.replace("{{hints}}", hints_str)
-    prompt = prompt_template.replace("{{text}}", text)
+    prompt = prompt.replace("{{text}}", text)
 
     return prompt
 
@@ -91,7 +91,7 @@ def _build_multimodal_prompt(ocr_text: str, hints: dict[str, str]) -> str:
     hints_str = ", ".join(f"{k}: {v}" for k, v in hints.items()) if hints else "No hints available"
 
     prompt = prompt_template.replace("{{ocr_text}}", ocr_section)
-    prompt = prompt_template.replace("{{hints}}", hints_str)
+    prompt = prompt.replace("{{hints}}", hints_str)
 
     return prompt
 
@@ -171,12 +171,12 @@ async def extract_with_gemini(
         prompt = _build_prompt(text, hints)
 
         response = client.models.generate_content(
-            model="gemini-2.0-flash-exp",
+            model="gemini-2.5-flash",
             contents=prompt,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
                 temperature=0.1,
-                max_tokens=2048,
+                max_output_tokens=2048,
             ),
         )
 
@@ -237,12 +237,12 @@ async def extract_with_gemini_multimodal(
         )
 
         response = client.models.generate_content(
-            model="gemini-2.0-flash-exp",
+            model="gemini-2.5-flash",
             contents=[image_part, prompt],
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
                 temperature=0.1,
-                max_tokens=2048,
+                max_output_tokens=2048,
             ),
         )
 
