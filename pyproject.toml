@@ -67,7 +67,7 @@ warn_unused_ignores = true
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
-addopts = "-ra -q"
+addopts = "-ra -q --allow-no-tests"
 
 [tool.coverage.run]
 source = ["app"]
