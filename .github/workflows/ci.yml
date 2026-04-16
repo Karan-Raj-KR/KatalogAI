@@ -19,7 +19,7 @@ jobs:
       - name: Install dependencies
         run: uv pip install -e ".[dev]"
       - name: Run tests
-        run: pytest
+        run: pytest --no-cov
       - name: Type check
         run: mypy app
       - name: Lint
