@@ -42,3 +42,14 @@ Thumbs.db
 
 # uv
 uv.lock
+
+# Ruff
+.ruff_cache/
+.mypy_cache/
+
+# Database
+*.db
+*.sqlite
+
+# Docker
+docker-compose.override.yml
